@@ -1,8 +1,6 @@
 import "dotenv/config";
-import express from "express";
+import app from "./app.js";
 import prisma from "./lib/prisma.js";
-
-const app = express();
 
 const PORT = 5000;
 

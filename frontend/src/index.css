@@ -1,0 +1,105 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #17233a;
+  --color-ink-soft: #1e2f4d;
+  --color-ink-line: #33456b;
+  --color-kraft: #efe3c8;
+  --color-kraft-dim: #d9c7a0;
+  --color-kraft-line: #c7b489;
+  --color-kraft-light: #f8f2e2;
+  --color-kraft-muted: #9c8f6c;
+  --color-stamp: #c1432e;
+  --color-stamp-dim: #9c3423;
+  --color-ink-text: #211a10;
+  --color-ink-text-soft: #5c5138;
+  --color-paper: #f3ecd8;
+  --color-paper-soft: #a9b7cf;
+
+  --font-display: 'Archivo Black', 'Arial Black', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  --animate-unfurl: unfurl 0.42s cubic-bezier(0.2, 0.8, 0.2, 1);
+  --animate-stamp-in: stamp-in 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+@keyframes unfurl {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes stamp-in {
+  from {
+    opacity: 0;
+    transform: rotate(-4deg) scale(1.8);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(-4deg) scale(1);
+  }
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-ink text-paper font-mono antialiased;
+  }
+}
+
+@layer components {
+  .tear {
+    position: relative;
+    height: 1px;
+    margin-inline: 24px;
+    background-image: repeating-linear-gradient(
+      to right,
+      var(--color-kraft-line) 0 8px,
+      transparent 8px 16px
+    );
+  }
+
+  .tear::before,
+  .tear::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 22px;
+    height: 22px;
+    background: var(--color-ink);
+    border-radius: 50%;
+    transform: translateY(-50%);
+  }
+
+  .tear::before {
+    left: -34px;
+  }
+
+  .tear::after {
+    right: -34px;
+  }
+
+  @media (max-width: 520px) {
+    .tear {
+      margin-inline: 16px;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
