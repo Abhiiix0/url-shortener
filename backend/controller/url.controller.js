@@ -1,3 +1,4 @@
+import redisClient from "../config/redis.js";
 import prisma from "../lib/prisma.js";
 
 function notFoundPage(shortCode) {
@@ -150,6 +151,12 @@ export const createUrl = async (req,res) => {
 export const redirectUrl = async (req, res) => {
     const { shortCode } = req.params;
     try {
+        const cachedUrl = await redisClient.get(shortCode)
+         if (cachedUrl) {
+            console.log("Redis HIT");
+            return res.redirect(302,cachedUrl);
+        }
+        console.log("Redis MISS");
         const url = await prisma.url.findUnique({
             where: { shortCode }
         })
@@ -160,7 +167,12 @@ export const redirectUrl = async (req, res) => {
             where: { shortCode },
             data: { clickCount: { increment: 1 } },
         })
+        await redisClient.set(shortCode, url.originalUrl, {
+            EX: 60 * 60 * 24 /
+        })
         return res.redirect(302, url.originalUrl)
+        
+       
     } catch (error) {
         console.error(error)
         return res.status(500).json({
