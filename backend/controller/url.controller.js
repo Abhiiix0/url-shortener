@@ -168,8 +168,9 @@ export const redirectUrl = async (req, res) => {
             data: { clickCount: { increment: 1 } },
         })
         await redisClient.set(shortCode, url.originalUrl, {
-            EX: 60 * 60 * 24 /
-        })
+            EX: 60 * 60 * 24
+        });
+
         return res.redirect(302, url.originalUrl)
         
        
