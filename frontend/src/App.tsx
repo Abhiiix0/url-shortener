@@ -1,6 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react'
 
-const API_BASE = ''
+const API_BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '')
 
 function normalizeUrl(raw: string): string {
   const trimmed = raw.trim()
@@ -24,7 +24,6 @@ interface Consignment {
   code: string
   original: string
   issued: Date
-  opened: number
 }
 
 function App() {
@@ -62,7 +61,6 @@ function App() {
         code: parsed.pathname.slice(1),
         original: data.originalUrl,
         issued: new Date(data.createdAt),
-        opened: data.clickCount ?? 0,
       })
       setCopied(false)
     } catch {
@@ -168,7 +166,7 @@ function App() {
                   className="font-semibold text-[clamp(20px,4vw,26px)] text-ink-text no-underline border-b-[1.5px] border-transparent transition-colors hover:border-ink-text focus-visible:border-ink-text focus-visible:outline-2 focus-visible:outline-stamp focus-visible:outline-offset-[3px]"
                   href={consignment.shortUrl}
                   target="_blank"
-                  rel="noopener noreferrer"
+                  rel="noopener"
                 >
                   <span className="text-ink-text-soft">
                     {consignment.domain}/
@@ -202,14 +200,6 @@ function App() {
                   </dt>
                   <dd className="m-0 text-ink-text overflow-hidden text-ellipsis whitespace-nowrap max-[520px]:whitespace-normal max-[520px]:break-all">
                     {formatIssued(consignment.issued)}
-                  </dd>
-                </div>
-                <div className="grid grid-cols-[84px_1fr] gap-3 py-[5px] text-[13px] max-[520px]:grid-cols-1 max-[520px]:gap-0.5">
-                  <dt className="text-[11px] font-semibold tracking-[0.04em] uppercase text-ink-text-soft pt-0.5">
-                    Opened
-                  </dt>
-                  <dd className="m-0 text-ink-text overflow-hidden text-ellipsis whitespace-nowrap max-[520px]:whitespace-normal max-[520px]:break-all">
-                    {consignment.opened} times
                   </dd>
                 </div>
               </dl>
