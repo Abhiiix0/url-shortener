@@ -13,5 +13,23 @@ model url {
   originalUrl String
   shortCode   String @unique
   createdAt   DateTime @default(now())
-  clickCount  Int      @default(0) 
+  clicks      ClickEvent[]
+}
+
+model ClickEvent{
+    id        String @id @default(cuid())
+    urlId     String
+    url       url      @relation(fields: [urlId], references: [id])
+    clickedAt DateTime @default(now())
+
+   
+    country   String?
+    city      String?
+    
+    deviceType String?
+    browser    String?
+    os         String?
+
+    referrer  String?
+    isBot     Boolean  @default(false)
 }

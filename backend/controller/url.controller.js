@@ -1,6 +1,8 @@
 import redisClient from "../config/redis.js";
 import prisma from "../lib/prisma.js";
-
+import { getLocationFromIP } from "../helper/getLocationFromIP.js";
+import {UAParser} from "ua-parser-js"
+import { isbot } from "isbot"
 function notFoundPage(shortCode) {
     return `<!doctype html>
 <html lang="en">
@@ -133,10 +135,9 @@ export const createUrl = async (req,res) => {
         return res.status(201).json({
             message: "Short URL created successfully",
             success: true,
-            newUrl:`${process.env.FRONTEND_URL}/${newUrl.shortCode}`,
+            newUrl:`${process.env.FRONTEND_URL.replace(/\/+$/, '')}/${newUrl.shortCode}`,
             originalUrl: newUrl.originalUrl,
             createdAt: newUrl.createdAt,
-            clickCount: newUrl.clickCount
         });
 
     } catch (error) {
@@ -149,12 +150,39 @@ export const createUrl = async (req,res) => {
 }
 
 export const redirectUrl = async (req, res) => {
-    const { shortCode } = req.params;
-    try {
-        const cachedUrl = await redisClient.get(shortCode)
-         if (cachedUrl) {
+  const { shortCode } = req.params;
+  const parser = new UAParser(req.headers["user-agent"])
+  const result = parser.getResult();
+  const referer = req.headers.referer;
+  const isBot = isbot(req.headers["user-agent"]);
+    // Get visitor IP
+    const ip = req.ip;
+
+    // Get location
+  const location = await getLocationFromIP(ip);
+  console.log("location",location),
+  console.log("Visitor IP:", ip);
+  console.log("referer", referer);
+  console.log("isBot", isBot);
+  console.log("result", result)
+  try {
+        const cached = await redisClient.get(shortCode)
+        if (cached) {
             console.log("Redis HIT");
-            return res.redirect(302,cachedUrl);
+            const { id, originalUrl } = JSON.parse(cached);
+            await prisma.clickEvent.create({
+                data: {
+                    urlId: id,
+                    deviceType: result?.device?.type,
+                    browser: result?.browser?.name,
+                    os: result?.os?.name,
+                    referrer: referer,
+                    isBot,
+                    country: location.country,
+                    city: location.city,
+                },
+            })
+            return res.redirect(302, originalUrl);
         }
         console.log("Redis MISS");
         const url = await prisma.url.findUnique({
@@ -163,16 +191,23 @@ export const redirectUrl = async (req, res) => {
         if (!url) {
             return res.status(404).send(notFoundPage(shortCode))
         }
-        await prisma.url.update({
-            where: { shortCode },
-            data: { clickCount: { increment: 1 } },
+        await prisma.clickEvent.create({
+            data: {
+                urlId: url.id,
+                deviceType: result?.device?.type,
+                browser: result?.browser?.name,
+                os: result?.os?.name,
+                referrer: referer,
+                isBot,
+                country: location.country,
+                city: location.city,
+            },
         })
-        await redisClient.set(shortCode, url.originalUrl, {
+        await redisClient.set(shortCode, JSON.stringify({ id: url.id, originalUrl: url.originalUrl }), {
             EX: 60 * 60 * 24
         });
 
         return res.redirect(302, url.originalUrl)
-        
        
     } catch (error) {
         console.error(error)
@@ -181,4 +216,81 @@ export const redirectUrl = async (req, res) => {
             success: false,
         })
     }
+}
+
+export const getAnalytics = async (req, res) => {
+  try {
+    const { shortCode } = req.params
+    const url = await prisma.url.findUnique({ where: { shortCode } })
+    if (!url) {
+      return res.status(404).json({
+        message: "Short URL not found",
+        success: false,
+      })
+    }
+
+    const humanClicks = { urlId: url.id, isBot: false }
+
+    const breakdown = async (field, fallback = "Unknown") => {
+      const rows = await prisma.clickEvent.groupBy({
+        by: [field],
+        where: humanClicks,
+        _count: { _all: true },
+      })
+      return rows
+        .map((row) => ({ name: row[field] ?? fallback, count: row._count._all }))
+        .sort((a, b) => b.count - a.count)
+    }
+
+    const [
+      totalClicks,
+      botClicks,
+      clicksByDay,
+      countries,
+      cities,
+      devices,
+      browsers,
+      os,
+      referrers,
+    ] = await Promise.all([
+      prisma.clickEvent.count({ where: { urlId: url.id } }),
+      prisma.clickEvent.count({ where: { urlId: url.id, isBot: true } }),
+      prisma.$queryRaw`
+        SELECT to_char("clickedAt", 'YYYY-MM-DD') AS date, COUNT(*)::int AS count
+        FROM "ClickEvent"
+        WHERE "urlId" = ${url.id} AND "isBot" = false
+        GROUP BY 1
+        ORDER BY 1
+      `,
+      breakdown("country"),
+      breakdown("city"),
+      breakdown("deviceType"),
+      breakdown("browser"),
+      breakdown("os"),
+      breakdown("referrer", "Direct / unknown"),
+    ])
+
+    return res.status(200).json({
+      success: true,
+      shortCode: url.shortCode,
+      originalUrl: url.originalUrl,
+      createdAt: url.createdAt,
+      totalClicks,
+      botClicks,
+      humanClicks: totalClicks - botClicks,
+      clicksByDay,
+      countries,
+      cities,
+      devices,
+      browsers,
+      os,
+      referrers,
+    })
+  } catch (error) {
+        console.error(error)
+        return res.status(500).json({
+            message: error.message,
+            success: false,
+        })
+  }
 }
