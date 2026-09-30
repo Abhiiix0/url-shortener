@@ -3,6 +3,31 @@ import prisma from "../lib/prisma.js";
 import { getLocationFromIP } from "../helper/getLocationFromIP.js";
 import {UAParser} from "ua-parser-js"
 import { isbot } from "isbot"
+
+export async function getALlAnalytics(req, res) {
+  try {
+    const allUrl = await prisma.url.findMany({
+      include: {
+        _count: {
+          select: {
+            clicks:true
+          }
+        }
+      }
+    })
+    console.log("allUrl", allUrl)
+    return res.status(200).json({
+      allUrls:allUrl
+    })
+  } catch (error) {
+      console.error(error)
+      return res.status(500).json({
+            message: error.message,
+            success: false,
+        })
+  }
+}
+
 function notFoundPage(shortCode) {
     return `<!doctype html>
 <html lang="en">
@@ -132,6 +157,10 @@ export const createUrl = async (req,res) => {
                 shortCode:Math.random().toString(36).slice(2, 8)
             }
         })
+      console.log("newUrl",newUrl)
+        await redisClient.set(newUrl.shortCode, JSON.stringify({ id: newUrl.id, originalUrl: newUrl.originalUrl }), {
+            EX: 60 * 60 * 24
+        });
         return res.status(201).json({
             message: "Short URL created successfully",
             success: true,
